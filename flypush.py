@@ -12,6 +12,7 @@ import datetime
 from subprocess import Popen
 from enum import Enum
 
+import pytz
 import psycopg2
 import qrcode
 import reportlab
@@ -154,7 +155,7 @@ def get_new_container_info(action, pg_cursor, source_container_info,
     if action == Actions.SEED:
         # TODO *could* use postgres times upon insert, but i might rather have
         # my data defined outside of the database, to switch backends
-        info['parents_added_at'] = 
+        info['parents_added_at'] = datetime.utcnow()
         # TODO another field only populated when everyone is the same genotype
         # (and leave these unpopulated in that case?)
         info['male_parent_ids'] = source_container_info['id']
@@ -165,7 +166,7 @@ def get_new_container_info(action, pg_cursor, source_container_info,
         raise NotImplementedError
 
     elif action == Actions.FLIP:
-        info['parents_removed_at'] = 
+        info['cleared_at'] = 
         # TODO make defaults
         info['food_protocol'] = source_container_info['food_protocol']
         # bottle or vial (way to encode efficiently?)
@@ -212,6 +213,7 @@ def qr_code(container_info):
     raise NotImplementedError
     return code
 
+
 def print_label(container_info):
     """
     """
@@ -222,6 +224,7 @@ def print_label(container_info):
     # or get it into such a format internally, and then pipe it to lpr
     raise NotImplementedError
 
+
 def main():
     """
     """
@@ -230,9 +233,17 @@ def main():
     # TODO create db + tables if not there?
 
     # TODO passwordless (+userless?) authentication?
-    conn = psycopg2.connect("dbname='flypush' user='flypush' host='atlas' " + 
-        "password='flypush'")
+    conn = psycopg2.connect(database='flypush', user='flypush', host='atlas', 
+        password='flypush')
+    conn.autocommit = True
     pg_cursor = conn.cursor()
+
+    '''
+    try:
+        # TODO read create_tables sql file
+        pg_cursor.execute()
+    except
+    '''
 
     while True:
         # TODO

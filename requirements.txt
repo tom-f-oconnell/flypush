@@ -1,3 +1,4 @@
+pytz
 # one QR code library to do both reading and writing?
 # TODO keep pil part? how does that notation work?
 qrcode[pil]
