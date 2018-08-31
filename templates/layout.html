@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+
+<html>
+  {# TODO how to handle title w/ template extensions? #}
+  <title>flypush@{{ host }}</title>
+
+  <nav>
+      <ul>
+        {% for table in tables %}
+        <li><a href="{{ table.name }}">{{ table }}</a></li>
+        {% endfor %}
+      </ul>
+  </nav>
+
+  <body>
+    {% block content %}
+    {% endblock %}
+  </body>
+</html>

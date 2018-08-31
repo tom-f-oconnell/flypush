@@ -1,0 +1,5 @@
+{% extends "layout.html" %}
+{% block content %}
+{# safe because pandas already outputs properly formatted html #}
+{{ table|safe }}
+{% endblock %}
