@@ -1,0 +1,13 @@
+- separate format for items with separate histories
+  - show one table per item, I think?
+  - or at least condense to one table?
+
+- let people add entries to everything
+  - particularly users, so i can work on below
+  - also let people edit existing entries in case they mistype?
+
+- user selection, remembering, and filter other items based on user
+
+- upload / take photos for QR code identification & action selection
+
+- upload CSVs to bulk add data, validate
