@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <meta charset="UTF-8">
+{# TODO highlight current page in nav / add title to tables #}
 
 <html>
   {# TODO how to handle title w/ template extensions? #}
@@ -12,6 +13,19 @@
         {% endfor %}
       </ul>
   </nav>
+
+  <form action="/login" method="POST">
+      <select name="user" required="true">
+        {% for user in users %}
+        <option value="{{ user }}">{{ user }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Submit</button>
+  </form>
+
+  <form action="/new_user" method="POST">
+      <button type="submit">New user</button>
+  </form>
 
   <body>
     {% block content %}

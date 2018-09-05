@@ -1,5 +1,19 @@
 {% extends "layout.html" %}
+{% from "field_macro.html" import render_field %}
 {% block content %}
 {# safe because pandas already outputs properly formatted html #}
 {{ table|safe }}
+{#
+<details>
+<summary>Add entry</summary>
+#}
+<form id="add" method=post>
+    <dl>
+        {% for f in form.fields %}
+        {{ render_field(form[f]) }}
+        {% endfor %}
+    </dl>
+    <input type=submit value=Add>
+</form>
+{# </details> #}
 {% endblock %}
