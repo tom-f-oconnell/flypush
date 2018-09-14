@@ -10,9 +10,10 @@ from flask import Flask
 from flask import render_template, abort, request
 from sqlalchemy import create_engine
 import pandas as pd
+# TODO clean up these imports...
 from wtforms import Form, StringField, SelectField, BooleanField, DateTimeField
 from wtforms import IntegerField, DateField, DecimalField, FileField
-from wtforms import TextAreaField
+from wtforms import TextAreaField, RadioField, SubmitField, validators
 
 session_key_file = 'FLASK_SESSION_SECRET'
 def generate_session_key():
@@ -46,7 +47,7 @@ class Table:
         # dropdown that lists the existing values in static table
         # TODO TODO should probably be two separate fields: one for updating
         # static table items, and one for adding new ones?
-        col_name, type_str, element_type, required = column_info
+        col_name, type_str, element_type, udt_name, nullable = column_info
         if type_str == 'ARRAY':
             if element_type == 'ARRAY':
                 raise ValueError('nested arrays not supported.')
@@ -79,6 +80,9 @@ class Table:
             # TODO default to current date / time
             field_cls = DateTimeField
 
+            # TODO if col_name is 'updated' autofill date
+            # (will need to handle an empty return from this fn, probably)
+
         elif type_str == 'date':
             # TODO tz indicated somewhere in postgres? should it have been?
             field_cls = DateField
@@ -88,21 +92,29 @@ class Table:
             if element_type is None:
                 field_cls = FileField
             else:
-                field_cls = lambda x: FileField(x, render_kw={'multiple': True})
+                field_cls = \
+                    lambda *args: FileField(*args, render_kw={'multiple': True})
 
         elif type_str == 'USER-DEFINED':
             # could add namespace later if it ends up mattering
-            #rows = list(conn.execute(
-            #    'SELECT unnest(enum_range(NULL::{}))'.format(
-            # TODO TODO need to get enum name/id from column, then can use
-            # either strategy to get values for that name/id
-            field_cls = StringField
-            # TODO radiofield
+            enum_q = 'SELECT unnest(enum_range(NULL::{}))'.format(udt_name)
+            print(enum_q)
+            values = [(x[0], pretty_name(x[0])) for x in conn.execute(enum_q)]
+            print('CHOICES={}'.format(values))
+            field_cls = \
+                lambda *args: RadioField(*args, choices=values)
 
         else:
             raise ValueError('unexpected type ' + type_str)
 
-        return field_cls(pretty_name(col_name))
+        checks = []
+        if nullable == 'NO':
+            checks.append(validators.DataRequired())
+
+        # TODO unique constraint?
+
+        return field_cls(pretty_name(col_name) +
+            ('?' if type_str == 'boolean' else ''), checks)
 
 
     def check_for_history(self):
@@ -185,6 +197,10 @@ class Table:
 
 
     # TODO order fields in same way as table, for rendering
+    # TODO TODO row only missing elements when updating rows (?)
+    # (e.g. when clearing bottles)
+    # TODO TODO or could show only next fields expected to be entry, determined
+    # from some kind of state machine)
     def add_row_form(self, request_form):
         class RowForm(Form):
             pass
@@ -195,6 +211,11 @@ class Table:
         # TODO map postgres check constraints to data validation
         # TODO map postgres not null constraints to validators.DataRequired
 
+
+        # TODO TODO dropdown on existing foreign keys OR field to add new one
+        # put add option in dropdown? display differently in case where db is
+        # empty?
+
         RowForm.fields = []
 
         self.check_for_history()
@@ -204,6 +225,7 @@ class Table:
               c.column_name,
               c.data_type,
               e.data_type AS element_type,
+              c.udt_name,
               c.is_nullable,
               c.ordinal_position
             FROM information_schema.columns c
@@ -239,9 +261,15 @@ class Table:
             # history table
             order_and_label.append((row[-1], label))
 
+        # TODO put question mark at end of label for boolean fields?
+
         # TODO just compute all (non-default?) attributes in jinja?
         RowForm.fields = \
             [x[1] for x in sorted(order_and_label, key=lambda x: x[0])]
+
+        if len(RowForm.fields) > 0:
+            setattr(RowForm, 'add', SubmitField('Add'))
+            RowForm.fields.append('add')
 
         # TODO best way to check for enum?
         # is enum the only thing i'm using that is USER-DEFINED in type
@@ -260,9 +288,16 @@ class Table:
 
 
 def list_tables():
-    tables = conn.execute("""SELECT table_name FROM information_schema.tables
-        WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND
-        table_schema NOT LIKE 'pg_toast%%'""")
+    # One of the % symbols is to escape the other (since it has special meaning
+    # in Python)
+    tables = conn.execute("""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND
+        table_schema NOT LIKE 'pg_toast%%' AND
+        table_name NOT IN (SELECT table_name FROM flypush_tables
+        WHERE website_visible IS NOT TRUE)
+    """)
     return [Table(t[0]) for t in tables if '_history' not in t[0]]
 
 def pretty_name(table_name):
@@ -293,14 +328,36 @@ def render_table(table_name):
         if t.name == table_name:
             table = t
 
-    if t is None:
+    if table is None:
         # TODO how to add message to 404?
         abort(404)
 
-    form = table.add_row_form(request.form)
-    print(form.fields)
+    editable = conn.execute("""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_name = '{}' AND
+        table_schema NOT IN ('pg_catalog', 'information_schema') AND
+        table_schema NOT LIKE 'pg_toast%%' AND
+        table_name NOT IN (SELECT table_name FROM flypush_tables
+        WHERE website_editable IS NOT TRUE)
+    """.format(table_name))
+    form = None
+    print(dir(editable))
+    print(editable.rowcount)
+    for r in editable:
+        print(r)
+    if editable.rowcount > 0:
+        form = table.add_row_form(request.form)
+        print(form.fields)
+
+    # TODO maybe include messages saying what is responsible for adding data
+    # (instructions for how to do so?) in cases where table isn't editable in
+    # website
 
     # TODO does this also take care of error message on validation failure?
+    # TODO TODO if dropdown on not null fk would be empty, display message
+    # saying you need to add some of that item first (circular deps? prevented
+    # at sql level?)
     if request.method == 'POST':
         if form.validate():
             print('form validated')
