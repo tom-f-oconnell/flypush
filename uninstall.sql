@@ -1,0 +1,2 @@
+DROP DATABASE IF EXISTS flypush;
+DROP ROLE IF EXISTS flypush;
