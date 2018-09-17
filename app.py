@@ -61,9 +61,14 @@ class Table:
             # and adds some kind of 'multiple' flag (or uses nested Field?) in
             # Array case?
 
-        # TODO TODO this query should also probably be changed to detect FKs
-        # from history table referencing static table, and also use combobox
-        # there
+        # TODO TODO TODO need to have ability to add new entries when foreign
+        # key is referencing from history to static table, maybe inline in that
+        # case, and maybe redirect to appropriate other page in other case
+        if self.join_with is None:
+            table_names = "('{}')".format(self.name)
+        else:
+            table_names = "('{}','{}')".format(self.name, self.join_with)
+
         fk_q = '''
         SELECT
             ccu.table_schema,
@@ -77,9 +82,9 @@ class Table:
             JOIN information_schema.constraint_column_usage AS ccu
               ON ccu.constraint_name = tc.constraint_name
               AND ccu.table_schema = tc.table_schema
-        WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name='{}'
+        WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name in {}
             AND kcu.column_name='{}'
-        '''.format(self.name, col_name)
+        '''.format(table_names, col_name)
         rows = conn.execute(fk_q)
         if rows.rowcount > 0:
             r = list(rows)[0]

@@ -97,6 +97,9 @@ CREATE TABLE IF NOT EXISTS fly_lines (
 
     nickname text UNIQUE,
 
+    /* TODO if genotype (maybe if not flybase_id only?), as opposed to three
+     * separate chromosomes, check correct format (# of semicolons) */
+
     /* TODO can use first second third? array? 'first' a reserved word?
     one
     two
@@ -111,6 +114,13 @@ CREATE TABLE IF NOT EXISTS fly_lines (
     dead boolean
 );
 
+CREATE TABLE IF NOT EXISTS food_protocols (
+    /* enforce valid python / sql identifier? */
+    name text PRIMARY KEY,
+    protocol text NOT NULL
+);
+/* TODO insert in some standard food protocols? do so in separate repo, setting
+ * up flypush to the needs of our lab? */
 
 CREATE TYPE container_type AS ENUM ('vial', 'bottle');
 
@@ -129,6 +139,7 @@ CREATE TABLE IF NOT EXISTS fly_containers (
     num_seed_females smallint CHECK (num_seed_females > 0),
     num_seed_males smallint CHECK (num_seed_males > 0),
 
+    food text REFERENCES food_protocols (name) NOT NULL,
     added_yeast boolean,
 
     female_line integer REFERENCES fly_lines (id),
@@ -158,21 +169,25 @@ CREATE TABLE IF NOT EXISTS container_history (
    indicate continuity... (ref source groups? just one?) */
 CREATE TABLE IF NOT EXISTS fly_groups (
     id SERIAL PRIMARY KEY,
-    fly_container integer REFERENCES fly_containers (id),
 
     /* Range of dates over which flies were allowed to ecclose, before being
-     * transferred. */
+     * transferred from first container referencing this group. */
+    /* TODO enforce that start date is no earlier than last time container was
+     * cleared, and maybe also set expected start to const num days from
+     * container start (or fn of temp)?
+     
+       even need the end date? just when flies are moved to 2nd container,
+       right?*/
+    eclosion_start_date date,
     /* TODO more precision? convention for picking start & end dates? 
       end date defined as clear, right? rename? */
-    eclosion_start_date date,
-    eclosion_end_date date,
 
+    /* TODO derive these from fly_containers?
     starved_at timestamptz(0),
-    /* TODO sep table to manage protocols? give each a name / version, then
-     * description? */
     starvation_protocol text,
     new_food_at timestamptz(0),
     new_food_protocol text,
+    */
 
     /*
     cold_anesthesia_at
@@ -182,6 +197,14 @@ CREATE TABLE IF NOT EXISTS fly_groups (
     notes text
 );
 
+CREATE TABLE IF NOT EXISTS fly_group_history (
+    updated timestamptz(0) PRIMARY KEY,
+    id integer REFERENCES fly_groups (id) NOT NULL,
+    container_id integer REFERENCES fly_containers (id) NOT NULL
+    /* TODO sep table to manage protocols? give each a name / version, then
+     * description? */
+);
+
 /* TODO how do i want to represent crosses? */
 
 CREATE TABLE IF NOT EXISTS experiment_series (
@@ -189,6 +212,7 @@ CREATE TABLE IF NOT EXISTS experiment_series (
     name text UNIQUE NOT NULL,
     owner text REFERENCES people (nickname),
     question text,
+    /* TODO maybe this default to owner in web app */
     experimenter text REFERENCES people (nickname)
 );
 
